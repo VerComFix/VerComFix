@@ -81,7 +81,7 @@ python eval.py -m [Model_Name]
 
 | Option | Required | Description |
 | :----- | :-:      | :--         |
-| `-m, --model` | True | Language Model to use:<br> codegen-6b, starcoder2-7b, codellama-7b-instruct, deepseek-coder-6.7b, deepseek_r1_distill, gpt-4o |
+| `-m, --model` | True | Language Model to use:<br> codegen-6b, starcoder2-7b, codellama-7b-instruct, deepseek-coder-6.7b, deepseek_r1_distill, gpt-4o, gemini-2.5-flash(with tool-using) |
 | `-f, --func` | False | API_Level Task / Function-Level Task|
 | `-o, --omit` | False | Omit Version Info in prompt |
 | `-g, -gpu` | False | Index of GPU device|
