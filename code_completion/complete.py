@@ -142,6 +142,9 @@ if __name__ == '__main__':
     if MODEL in ['deepseek-v3', 'gpt-4o']:
         client, model, price = MODEL_FACTORY[MODEL]()
         engine = GLMCompletionEngine(client, model, price)
+    elif MODEL in ['gemini-2.5-flash']:
+        client, model, price = MODEL_FACTORY[MODEL]()
+        engine = GLMCompletionEngine(client, model, price, useGemini=True)
     else:
         model, tokenizer = MODEL_FACTORY[MODEL]()
         engine = CodeLLMCompletionEngine(model, tokenizer)
