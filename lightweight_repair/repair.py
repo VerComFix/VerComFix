@@ -1,13 +1,11 @@
-import os, sys, pickle, argparse, pymysql
+import pickle, argparse, pymysql
 import torch.cuda
 from tqdm import tqdm
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from complete import query_api_task_info
+from tasks import APILevelRepairTask
 from global_config import DB_CONFIG, GITHUB_CODE_DOWNLOAD_BASE_DIR
-from code_completion.complete import query_api_task_info
-from code_completion.tasks    import APILevelRepairTask
-from code_completion.models   import MODEL_FACTORY, CodeLLMCompletionEngine, GLMCompletionEngine
-from code_completion.eval     import REPAIR_TASK_DIR
+from models import MODEL_FACTORY, CodeLLMCompletionEngine, GLMCompletionEngine, CopilotCompletionEngine
 
 arg_parser = argparse.ArgumentParser()
 arg_parser.add_argument('-m', '--model', help='model name', type=str, required=True)
@@ -36,20 +34,37 @@ if __name__ == '__main__':
     print(f'[LOG] Sample: using model "{MODEL}"')
 
     # init engine
-    if MODEL in ['deepseek-v3', 'gpt-4o']:
+    if MODEL == 'copilot':
+        project_root, app_name = MODEL_FACTORY[MODEL]()
+        app_name = app_name if app_name else 'Visual Studio Code'
+        engine = CopilotCompletionEngine(project_root, app_name=app_name)
+    elif MODEL in ['deepseek-v3', 'gpt-4o']:
         client, model, price = MODEL_FACTORY[MODEL]()
         engine = GLMCompletionEngine(client, model, price)
+    elif MODEL in ['gemini-2.5-flash']:
+        client, model, price = MODEL_FACTORY[MODEL]()
+        engine = GLMCompletionEngine(client, model, price, useGemini=True)
     else:
         model, tokenizer = MODEL_FACTORY[MODEL]()
         engine = CodeLLMCompletionEngine(model, tokenizer)
     print('[LOG] Model initialized')
 
     # load tasks (api_level) => 从对应的 file
-    with open(f'{REPAIR_TASK_DIR}/{MODEL}.pkl', 'rb') as f:
+    with open(f'./to_repair/{MODEL}.pkl', 'rb') as f:
         tasks = pickle.load(f)
-    
+        
     repaired, results = 0, []
-    for task_info in tqdm(tasks):
+    # recover
+    try:
+        with open(f'./repaired/{MODEL}_max_task.txt', 'r', encoding='utf-8') as f:
+            min_idx = int(f.read())+1
+        print(f'[LOG] Recover from task_id {min_idx}')
+    except Exception:
+        min_idx = 0
+        print(f'[LOG] Start from scratch')
+
+    for idx in tqdm(range(min_idx, len(tasks))):
+        task_info = tasks[idx]
         tid, stmt, pred_fqn, desc, api_sig = task_info
 
         # construct task
@@ -68,7 +83,8 @@ if __name__ == '__main__':
         else:                   res = engine.complete(task)
         
         results.append((tid, res))
-
-    # dump
-    with open(f'./repaired/{MODEL}.pkl', 'wb') as f:
-        pickle.dump(results, f)
+        res = (tid, res)
+        with open(f'./repaired/{MODEL}.pkl', 'wb') as f:
+            pickle.dump(results, f)
+        with open(f'./repaired/{MODEL}_max_task.txt', 'w', encoding='utf-8') as f:
+            f.write(str(idx))
